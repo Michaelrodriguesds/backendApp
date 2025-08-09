@@ -18,6 +18,7 @@ router = APIRouter(
     },
 )
 
+# ✅ Criar nova nota
 @router.post("/", response_model=NoteDB, status_code=status.HTTP_201_CREATED)
 async def create_note(
     note: NoteCreate,
@@ -25,6 +26,8 @@ async def create_note(
     current_user: UserDB = Depends(get_current_user)
 ):
     notes_collection = await get_notes_collection()
+
+    # Monta dicionário com os dados recebidos + infos adicionais
     note_dict = note.dict()
     note_dict.update({
         "user_id": current_user.id,
@@ -35,8 +38,10 @@ async def create_note(
 
     result = await notes_collection.insert_one(note_dict)
     note_dict["id"] = str(result.inserted_id)
+
     return NoteDB(**note_dict)
 
+# ✅ Listar notas do usuário logado (opcional: por projeto)
 @router.get("/", response_model=List[NoteDB])
 async def list_notes(
     project_id: Optional[str] = None,
@@ -53,6 +58,7 @@ async def list_notes(
         notes.append(NoteDB(**note))
     return notes
 
+# ✅ Buscar uma nota específica por ID
 @router.get("/{note_id}", response_model=NoteDB)
 async def get_note(
     note_id: str,
@@ -65,9 +71,11 @@ async def get_note(
     })
     if not note:
         raise HTTPException(status_code=404, detail="Nota não encontrada")
+    
     note["id"] = str(note["_id"])
     return NoteDB(**note)
 
+# ✅ Atualizar parcialmente uma nota
 @router.put("/{note_id}", response_model=NoteDB)
 async def update_note(
     note_id: str,
@@ -75,6 +83,8 @@ async def update_note(
     current_user: UserDB = Depends(get_current_user)
 ):
     notes_collection = await get_notes_collection()
+    
+    # Remove campos não definidos no update
     update_data = note_update.dict(exclude_unset=True)
     update_data["updated_at"] = datetime.utcnow()
 
@@ -90,12 +100,14 @@ async def update_note(
     updated_note["id"] = str(updated_note["_id"])
     return NoteDB(**updated_note)
 
+# ✅ Deletar uma nota
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_note(
     note_id: str,
     current_user: UserDB = Depends(get_current_user)
 ):
     notes_collection = await get_notes_collection()
+
     note = await notes_collection.find_one({
         "_id": ObjectId(note_id),
         "user_id": current_user.id
