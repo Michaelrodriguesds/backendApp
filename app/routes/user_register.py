@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from bson import ObjectId
 from app.models.user import UserCreate, UserDB
 from app.database import get_users_collection
-from app.utils.security import get_password_hash
+from app.utils.security import get_password_hash, get_current_user   # ← get_current_user adicionado
 from datetime import datetime
 import logging
 
@@ -13,7 +13,8 @@ router = APIRouter(
 
 logger = logging.getLogger(__name__)
 
-# Rota para registrar novo usuário
+
+# ── POST /users/register ──────────────────────────────────────── ORIGINAL
 @router.post("/register", response_model=UserDB, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate):
     users_collection = await get_users_collection()
@@ -31,16 +32,16 @@ async def register(user: UserCreate):
 
     # Monta os dados para o MongoDB
     user_data = {
-        "name": user.name,
-        "email": user.email,
+        "name":            user.name,
+        "email":           user.email,
         "hashed_password": hashed_password,
-        "theme": user.theme or "light",
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-        "disabled": False,
-        "projects_count": 0,
-        "total_invested": 0.0,
-        "is_admin": False
+        "theme":           user.theme or "light",
+        "created_at":      datetime.utcnow(),
+        "updated_at":      datetime.utcnow(),
+        "disabled":        False,
+        "projects_count":  0,
+        "total_invested":  0.0,
+        "is_admin":        False
     }
 
     # Insere no banco
@@ -55,7 +56,17 @@ async def register(user: UserCreate):
     return UserDB(**created_user)
 
 
-# Rota para buscar um usuário pelo ID
+# ── GET /users/profile/ ───────────────────────────────────────────── NOVO
+# Chamado por user_service.dart (UsuarioService.obterPerfil) na perfil_screen
+# Antes não existia — causava 404 ao carregar o perfil
+# Retorna os dados do usuário autenticado pelo Bearer token
+@router.get("/profile/", response_model=UserDB)
+async def get_profile(current_user: UserDB = Depends(get_current_user)):
+    """Retorna o perfil do usuário autenticado."""
+    return current_user
+
+
+# ── GET /users/{user_id} ──────────────────────────────────────────── ORIGINAL
 @router.get("/{user_id}", response_model=UserDB)
 async def get_user_by_id(user_id: str):
     users_collection = await get_users_collection()
@@ -68,7 +79,7 @@ async def get_user_by_id(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    # Remove campos desnecessários/sensíveis antes de retornar
+    # Remove campos sensíveis antes de retornar
     user["id"] = str(user["_id"])
     del user["_id"]
     if "hashed_password" in user:

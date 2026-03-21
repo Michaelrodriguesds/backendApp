@@ -13,14 +13,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configurações baseadas no ambiente (desenvolvimento ou produção)
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")  # Padrão: desenvolvimento
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 IS_PRODUCTION = ENVIRONMENT == "production"
 
 # Configurações do CORS baseadas no ambiente
 ALLOWED_ORIGINS = [
-    "*"  # Permite tudo em desenvolvimento
+    "*"
 ] if not IS_PRODUCTION else [
-    "https://seu-frontend.com",  # Substitua pelo domínio do seu frontend em produção
+    "https://seu-frontend.com",
     "https://www.seu-frontend.com"
 ]
 
@@ -29,17 +29,17 @@ app = FastAPI(
     title="Financeiro API",
     version="1.0.0",
     description="API for personal financial management",
-    docs_url="/docs" if not IS_PRODUCTION else None,  # Desativa docs em produção
-    redoc_url="/redoc" if not IS_PRODUCTION else None  # Desativa redoc em produção
+    docs_url="/docs" if not IS_PRODUCTION else None,
+    redoc_url="/redoc" if not IS_PRODUCTION else None
 )
 
-# Middleware CORS com configurações seguras para produção
+# Middleware CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Métodos explícitos
-    allow_headers=["Authorization", "Content-Type"],  # Headers explícitos
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Inicialização do banco de dados ao iniciar a aplicação
@@ -48,11 +48,8 @@ async def startup_event() -> None:
     try:
         await init_db()
         logger.info(f"✅ Database initialized successfully in {ENVIRONMENT} environment")
-        
-        # Log adicional para ajudar no debug
         db_url = os.getenv("DATABASE_URL", "local database")
-        logger.info(f"🔗 Database connection: {db_url[:15]}...")  # Log parcial da URL por segurança
-        
+        logger.info(f"🔗 Database connection: {db_url[:15]}...")
     except Exception as e:
         logger.error(f"❌ Startup error: {e}", exc_info=True)
         raise
@@ -62,18 +59,20 @@ from app.routes import (
     project,
     note,
     user_login,
-    user_register
+    user_register,
+    stats,          # ← NOVO: rota de estatísticas exigida pelo EstatisticasScreen
 )
 
-# Inclusão dos routers com prefixo condicional se necessário
-API_PREFIX = "/api" if not IS_PRODUCTION else ""  # Pode remover o prefixo em produção se necessário
+# Prefixo de rota
+API_PREFIX = "/api" if not IS_PRODUCTION else ""
 
-app.include_router(user_login.router, prefix=API_PREFIX, tags=["Authentication"])
+app.include_router(user_login.router,    prefix=API_PREFIX, tags=["Authentication"])
 app.include_router(user_register.router, prefix=API_PREFIX, tags=["Users"])
-app.include_router(project.router, prefix=API_PREFIX, tags=["Projects"])
-app.include_router(note.router, prefix=API_PREFIX, tags=["Notes"])
+app.include_router(project.router,       prefix=API_PREFIX, tags=["Projects"])
+app.include_router(note.router,          prefix=API_PREFIX, tags=["Notes"])
+app.include_router(stats.router,         prefix=API_PREFIX, tags=["Statistics"])  # ← NOVO
 
-# Rota raiz de boas-vindas com informações do ambiente
+# Rota raiz
 @app.get("/", tags=["Root"])
 async def root() -> dict:
     return {
@@ -83,7 +82,7 @@ async def root() -> dict:
         "time": datetime.utcnow().isoformat()
     }
 
-# Rota para health check aprimorada
+# Health check
 @app.get("/health", tags=["Health Check"])
 async def health_check() -> dict:
     try:
@@ -104,11 +103,10 @@ async def health_check() -> dict:
             "timestamp": datetime.utcnow().isoformat()
         }
 
-# Configuração para o Render (opcional)
+# Configuração para o Render
 if __name__ == "__main__":
     import uvicorn
-    
-    # Configurações diferentes para local vs produção
+
     if IS_PRODUCTION:
         uvicorn.run(
             "main:app",
@@ -122,6 +120,6 @@ if __name__ == "__main__":
             "main:app",
             host="0.0.0.0",
             port=8000,
-            reload=True,  # Auto-reload apenas em desenvolvimento
+            reload=True,
             log_level="debug"
         )
