@@ -60,7 +60,8 @@ from app.routes import (
     note,
     user_login,
     user_register,
-    stats,          # ← NOVO: rota de estatísticas exigida pelo EstatisticasScreen
+    stats,
+    password_reset,   # ← recuperação de senha
 )
 
 # Prefixo de rota
